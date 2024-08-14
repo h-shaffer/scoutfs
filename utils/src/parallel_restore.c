@@ -1839,6 +1839,14 @@ spr_err_t scoutfs_parallel_restore_import_super(struct scoutfs_parallel_restore_
 	u64 start;
 	u64 len;
 
+	/* Require Scoutfs format v2 for restore */
+	if (le64_to_cpu(super->fmt_vers) < 2)
+		return EINVAL;
+
+	/* Check that device given is a Meta Device */
+	if ((super->flags & SCOUTFS_FLAG_IS_META_BDEV) == 0)
+		return EINVAL;
+
 	if (wri_has_super(wri))
 		return EINVAL;
 
