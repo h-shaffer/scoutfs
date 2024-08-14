@@ -10,7 +10,7 @@ mkdir -p "$SCR"
 # XXX this is all pretty manual, would be nice to have helpers
 echo "== make small meta fs"
 # meta device just big enough for reserves and the metadata we'll fill
-scoutfs mkfs -A -f -Q 0,127.0.0.1,53000 -m 10G -d 60G "$T_EX_META_DEV" "$T_EX_DATA_DEV" > $T_TMP.mkfs.out 2>&1 || \
+scoutfs mkfs -V 2 -A -f -Q 0,127.0.0.1,53000 -m 10G -d 60G "$T_EX_META_DEV" "$T_EX_DATA_DEV" > $T_TMP.mkfs.out 2>&1 || \
 	t_fail "mkfs failed"
 mount -t scoutfs -o metadev_path=$T_EX_META_DEV,quorum_slot_nr=0 \
 	"$T_EX_DATA_DEV" "$SCR"
