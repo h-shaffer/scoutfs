@@ -50,6 +50,9 @@ struct scoutfs_parallel_restore_inode {
 	struct timespec ctime;
 	struct timespec mtime;
 	struct timespec crtime;
+#ifdef SCOUTFS_FORMAT_VERSION_FEAT_PROJECT_ID
+	u64 proj;
+#endif
 
 	/* regular files */
 	u64 data_version;
