@@ -12,9 +12,6 @@ echo "== make small meta fs"
 # meta device just big enough for reserves and the metadata we'll fill
 scoutfs mkfs -V 2 -A -f -Q 0,127.0.0.1,53000 -m 10G -d 60G "$T_EX_META_DEV" "$T_EX_DATA_DEV" > $T_TMP.mkfs.out 2>&1 || \
 	t_fail "mkfs failed"
-mount -t scoutfs -o metadev_path=$T_EX_META_DEV,quorum_slot_nr=0 \
-	"$T_EX_DATA_DEV" "$SCR"
-umount "$SCR"
 
 echo "== parallel_restore"
 parallel_restore -m "$T_EX_META_DEV" > /dev/null || t_fail "parallel_restore"
@@ -60,6 +57,20 @@ echo "== ENOSPC"
 scoutfs mkfs -V 2 -A -f -Q 0,127.0.0.1,53000 -m 10G -d 60G "$T_EX_META_DEV" "$T_EX_DATA_DEV" > $T_TMP.mkfs.out 2>&1 || \
 	t_fail "mkfs failed"
 parallel_restore -m "$T_EX_META_DEV" -d 600:1000 -f 600:1000 -n 4000000 | grep died 2>&1 && t_fail "parallel_restore"
+
+echo "== Attempt to restore data device"
+scoutfs mkfs -V 2 -A -f -Q 0,127.0.0.1,53000 -m 10G -d 60G "$T_EX_META_DEV" "$T_EX_DATA_DEV" > $T_TMP.mkfs.out 2>&1 || \
+	t_fail "mkfs failed"
+
+echo "== parallel_restore data device"
+parallel_restore -m "$T_EX_DATA_DEV" | grep died 2>&1 && t_fail "parallel_restore"
+
+echo "== Attempt format_v1 restore"
+scoutfs mkfs -V 1 -A -f -Q 0,127.0.0.1,53000 -m 10G -d 60G "$T_EX_META_DEV" "$T_EX_DATA_DEV" > $T_TMP.mkfs.out 2>&1 || \
+	t_fail "mkfs failed"
+
+echo "== parallel_restore format_v1 fs"
+parallel_restore -m "$T_EX_META_DEV" | grep died 2>&1 && t_fail "parallel_restore"
 
 echo "== cleanup"
 rmdir "$SCR"
