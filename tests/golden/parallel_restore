@@ -23,4 +23,7 @@ MetaData  64KB    163840  34721    129119    21
 == parallel_restore data device
 == Attempt format_v1 restore
 == parallel_restore format_v1 fs
+== test if previously mounted
+== mount before restore
+== parallel_restore previously mounted device
 == cleanup
