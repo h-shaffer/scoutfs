@@ -46,6 +46,10 @@ struct scoutfs_parallel_restore_inode {
 	u32 gid;
 	u32 mode;
 	u32 rdev;
+#ifdef SCOUTFS_FORMAT_VERSION_FEAT_RETENTION
+	u32 flags;
+	u8 pad[4];
+#endif
 	struct timespec atime;
 	struct timespec ctime;
 	struct timespec mtime;
