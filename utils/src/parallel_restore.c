@@ -405,7 +405,10 @@ static spr_err_t map_start_key(struct scoutfs_key *start, struct scoutfs_key *ke
 		init_key(start, SCOUTFS_INODE_INDEX_ZONE, 0, 0,
 			 le64_to_cpu(key->_sk_second) & ~(u64)SCOUTFS_LOCK_SEQ_GROUP_MASK,
 			 0, 0);
-
+#ifdef SCOUTFS_FORMAT_VERSION_FEAT_QUOTA
+	} else if (key->sk_zone == SCOUTFS_QUOTA_ZONE) {
+		init_key(start, SCOUTFS_QUOTA_ZONE, 0, 0, le64_to_cpu(key->_sk_second), 0, 0);
+#endif
 	} else {
 		return EINVAL;
 	}
@@ -923,6 +926,48 @@ static spr_err_t insert_srch_item(struct scoutfs_parallel_restore_writer *wri,
 
 	return err;
 }
+
+#ifdef SCOUTFS_FORMAT_VERSION_FEAT_QUOTA
+static spr_err_t insert_quota_item(struct scoutfs_parallel_restore_writer *wri,
+				  struct scoutfs_parallel_restore_quota_rule *rule)
+{
+	struct scoutfs_quota_rule_val *rv;
+	struct btree_item *bti;
+	spr_err_t err;
+
+	err = bti_alloc(sizeof(struct scoutfs_quota_rule_val), &bti);
+	if (err)
+		goto out;
+
+	rv = bti->val;
+	memset(rv, 0, sizeof(struct scoutfs_quota_rule_val));
+	rv->limit = cpu_to_le64(rule->limit);
+	rv->prio = rule->prio;
+	rv->op = rule->op;
+	rv->rule_flags = rule->rule_flags;
+	rv->name_val[0] = cpu_to_le64(rule->names[0].val);
+	rv->name_source[0] = rule->names[0].source;
+	rv->name_flags[0] = rule->names[0].flags;
+	rv->name_val[1] = cpu_to_le64(rule->names[1].val);
+	rv->name_source[1] = rule->names[1].source;
+	rv->name_flags[1] = rule->names[1].flags;
+	rv->name_val[2] = cpu_to_le64(rule->names[2].val);
+	rv->name_source[2] = rule->names[2].source;
+	rv->name_flags[2] = rule->names[2].flags;
+	memset(&rv->_pad, 0, sizeof(rv->_pad));
+
+	init_key(&bti->key, SCOUTFS_QUOTA_ZONE, SCOUTFS_QUOTA_RULE_TYPE,
+			0, scoutfs_hash64(&rv, sizeof(rv)), 0, 0);
+
+	err = insert_fs_item(wri, bti);
+	if (err) {
+		free(bti);
+		goto out;
+	}
+out:
+	return err;
+}
+#endif
 
 #define UNLINKED_AVL_HEIGHT 255
 
@@ -1784,6 +1829,17 @@ spr_err_t scoutfs_parallel_restore_add_progress(struct scoutfs_parallel_restore_
 
 	return err;
 }
+
+#ifdef SCOUTFS_FORMAT_VERSION_FEAT_QUOTA
+spr_err_t scoutfs_parallel_restore_add_quota_rule(struct scoutfs_parallel_restore_writer *wri,
+						struct scoutfs_parallel_restore_quota_rule *rule)
+{
+	if (!wri_has_super(wri))
+		return EINVAL;
+
+	return insert_quota_item(wri, rule);
+}
+#endif
 
 spr_err_t scoutfs_parallel_restore_write_buf(struct scoutfs_parallel_restore_writer *wri,
 					     void *buf, size_t len, off_t *off_ret,
