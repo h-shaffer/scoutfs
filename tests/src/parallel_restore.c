@@ -14,12 +14,14 @@
 #include <sys/prctl.h>
 #include <signal.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 
 #include "../../utils/src/sparse.h"
 #include "../../utils/src/util.h"
 #include "../../utils/src/list.h"
 #include "../../utils/src/parse.h"
 #include "../../kmod/src/format.h"
+#include "../../kmod/src/ioctl.h"
 #include "../../utils/src/parallel_restore.h"
 
 /*
@@ -252,6 +254,31 @@ generate_entry(struct opts *opts, char *prefix, u64 nr, u64 dir_ino, u64 pos, u6
 	memcpy(entry->name, buf, bytes);
 
 	return entry;
+}
+
+/*
+ * since the _parallel_restore_quota_rule mimics the squota_rule found in the
+ * kernel we can also mimic its rule_to_irule function
+ */
+
+#define DEFAULT_RULE_STR "7 13,L,- 15,L,- 17,L,- I 33 -"
+
+static struct scoutfs_parallel_restore_quota_rule *
+generate_quotas(struct opts *opts)
+{
+	struct scoutfs_parallel_restore_quota_rule *prule;
+	int err;
+
+	prule = calloc(1,sizeof(struct scoutfs_parallel_restore_quota_rule));
+	error_exit(!prule, "Quota rule alloc failed");
+
+	err = sscanf(DEFAULT_RULE_STR, " %hhu %llu,%c,%c %llu,%c,%c %llu,%c,%c %c %llu %c",
+		     &prule->prio, &prule->names[0].val, &prule->names[0].source, &prule->names[0].flags, &prule->names[1].val,
+		     &prule->names[1].source, &prule->names[1].flags, &prule->names[2].val, &prule->names[2].source, &prule->names[2].flags,
+			 &prule->op, &prule->limit, &prule->rule_flags);
+	error_exit(err != 13, "invalid quota rule, missing fields. nr fields: %d rule str: %s\n", err, DEFAULT_RULE_STR);
+
+	return prule;
 }
 
 static u64 random64(void)
@@ -596,13 +623,16 @@ static int do_restore(struct opts *opts)
 
 	ret = pread(dev_fd, super, SCOUTFS_BLOCK_SM_SIZE,
 		    SCOUTFS_SUPER_BLKNO << SCOUTFS_BLOCK_SM_SHIFT);
-	error_exit(ret != SCOUTFS_BLOCK_SM_SIZE, "error reading super, ret %d", ret);
+	error_exit(ret != SCOUTFS_BLOCK_SM_SIZE, "errorreading super, ret %d", ret);
 
 	ret = scoutfs_parallel_restore_create_writer(&wri);
 	error_exit(ret, "create writer %d", ret);
 
 	ret = scoutfs_parallel_restore_import_super(wri, super, dev_fd);
 	error_exit(ret, "import super %d", ret);
+
+	ret = scoutfs_parallel_restore_add_quota_rule(wri, generate_quotas(opts));
+	error_exit(ret, "add quotas %d", ret);
 
 	slices = calloc(1 + opts->nr_writers, sizeof(struct scoutfs_parallel_restore_slice));
 	error_exit(!slices, "alloc slices");
