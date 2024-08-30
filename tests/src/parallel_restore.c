@@ -20,6 +20,7 @@
 #include "../../utils/src/list.h"
 #include "../../utils/src/parse.h"
 #include "../../kmod/src/format.h"
+#include "../../kmod/src/ioctl.h"
 #include "../../utils/src/parallel_restore.h"
 
 /*
@@ -63,6 +64,7 @@ struct opts {
 	bool read_only;
 	unsigned long long seed;
 	unsigned long long nr_writers;
+	char *rule_str;
 };
 
 static void usage(void)
@@ -76,6 +78,7 @@ static void usage(void)
 	       " -r          | read-only, all work except writing, measure cpu cost\n"
 	       " -s NR       | randomization seed (random)\n"
 	       " -w NR       | number of writing processes to fork (online cpus)\n"
+		   " -R RULE_STR | quota rule string\n"
 	       );
 }
 
@@ -252,6 +255,55 @@ generate_entry(struct opts *opts, char *prefix, u64 nr, u64 dir_ino, u64 pos, u6
 	memcpy(entry->name, buf, bytes);
 
 	return entry;
+}
+
+/*
+ * since the _parallel_restore_quota_rule mimics the squota_rule found in the
+ * kernel we can also mimic its rule_to_irule function
+ */
+static void insert_prule(struct scoutfs_parallel_restore_quota_rule *prule,
+						 int dev_fd)
+{
+	struct scoutfs_ioctl_quota_rule *irule = NULL;
+	int err;
+
+	irule = malloc(sizeof(struct scoutfs_ioctl_quota_rule));
+	error_exit(!irule, "error allocating ioctl quota rule");
+
+	memset(irule, 0, sizeof(struct scoutfs_ioctl_quota_rule));
+
+	irule->limit = prule->limit;
+	irule->prio = prule->prio;
+	irule->op = prule->op;
+	irule->rule_flags = prule->rule_flags;
+	irule->name_val[0] = prule->names[0].val;
+	irule->name_source[0] = prule->names[0].source;
+	irule->name_flags[0] = prule->names[0].flags;
+	irule->name_val[1] = prule->names[1].val;
+	irule->name_source[1] = prule->names[1].source;
+	irule->name_flags[1] = prule->names[1].flags;
+	irule->name_val[2] = prule->names[2].val;
+	irule->name_source[2] = prule->names[2].source;
+	irule->name_flags[2] = prule->names[2].flags;
+
+	err = ioctl(dev_fd, true, &irule);
+	if (irule)
+		free(irule)
+	if (err < 0)
+		error_exit(err, "error inserting quota rule ioctl");
+}
+
+static struct scoutfs_parallel_restore_quota_rule *
+generate_quotas(struct opts *opts, int dev_fd)
+{
+	struct scoutfs_parallel_restore_quota_rule *prule;
+
+	prule = malloc(sizeof(struct scoutfs_parallel_restore_quota_rule));
+	error_exit(!prule, "error allocating generated quota rule");
+
+	insert_prule(prule, dev_fd);
+
+	ret = 0;
 }
 
 static u64 random64(void)
