@@ -1874,7 +1874,7 @@ out:
  */
 static spr_err_t scoutfs_check_if_previous_mount(int fd)
 {
-	struct scoutfs_quorum_block *blk = NULL;
+	struct scoutfs_quorum_block *blk;
 	struct scoutfs_quorum_block_event *ev;
 	u64 blkno;
 	int i, j;
