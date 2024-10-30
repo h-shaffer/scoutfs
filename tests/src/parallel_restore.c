@@ -462,6 +462,7 @@ static void writer_proc(struct opts *opts, struct writer_args *args)
 {
 	struct scoutfs_parallel_restore_writer *wri = NULL;
 	struct scoutfs_parallel_restore_entry *entry;
+	struct scoutfs_parallel_restore_quota_rule *rule = NULL;
 	struct dir_pos *dirs = NULL;
 	struct write_result res;
 	struct gen_inode *gino;
@@ -493,6 +494,11 @@ static void writer_proc(struct opts *opts, struct writer_args *args)
 		ret = scoutfs_parallel_restore_add_inode(wri, &gino->inode);
 		error_exit(ret, "thread add root inode %d", ret);
 		free_gino(gino);
+
+		rule = generate_quota(opts);
+		ret = scoutfs_parallel_restore_add_quota_rule(wri, rule);
+		free(rule);
+		error_exit(ret, "add quotas %d", ret);
 	}
 
 	/* create root entry for our top level dir */
@@ -591,7 +597,6 @@ static int do_restore(struct opts *opts)
 {
 	struct scoutfs_parallel_restore_writer *wri = NULL;
 	struct scoutfs_parallel_restore_slice *slices = NULL;
-	struct scoutfs_parallel_restore_quota_rule *rule = NULL;
 	struct scoutfs_super_block *super = NULL;
 	struct write_result res;
 	struct writer_args *args;
@@ -631,11 +636,6 @@ static int do_restore(struct opts *opts)
 
 	ret = scoutfs_parallel_restore_import_super(wri, super, dev_fd);
 	error_exit(ret, "import super %d", ret);
-
-	rule = generate_quota(opts);
-	ret = scoutfs_parallel_restore_add_quota_rule(wri, rule);
-	free(rule);
-	error_exit(ret, "add quotas %d", ret);
 
 	slices = calloc(1 + opts->nr_writers, sizeof(struct scoutfs_parallel_restore_slice));
 	error_exit(!slices, "alloc slices");

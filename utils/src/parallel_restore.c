@@ -1812,6 +1812,7 @@ spr_err_t scoutfs_parallel_restore_add_quota_rule(struct scoutfs_parallel_restor
 	if (!wri_has_super(wri))
 		return EINVAL;
 
+	fprintf(stderr, "%u quota add rule\n", getpid());
 	return insert_quota_item(wri, rule);
 }
 
